@@ -14,7 +14,7 @@ EthernetClient client;
 //----------------- BEGIN SD DEFINITIONS -----------------
 // SD_FAT_TYPE = 0 for SdFat/File as defined in SdFatConfig.h,
 // 1 for FAT16/FAT32, 2 for exFAT, 3 for FAT16/FAT32 and exFAT.
-#define SD_FAT_TYPE 3
+#define SD_FAT_TYPE 2
 #define USE_ARDUINO_SPI_LIBRARY 1
 
 // SDCARD_SS_PIN is defined for the built-in SD on some boards.
@@ -75,15 +75,19 @@ void request(float h, float t, char host[]) {
   pinMode(4,OUTPUT); 
   digitalWrite(10, HIGH); // select ethernet mode
 
-  if (client.connect(host, 8080)) {
-    char URL[] = "GET /temperatura/informar?";
-    String query = "id=" + ID + "&u=" + String(h) + "&t=" + String(t);
-    
-    Serial.println(query);
-    client.println(String(URL) + query);
+  if (client.connect(host, 80)) {
+    String queryString = "{ \"id\": \"" + ID + "\", \"u\": " + String(h) + ", \"t\": " + String(t) + " }";
+
+    Serial.println(host);
+    Serial.println(queryString);
+    client.println(F("POST /temperaturas/informar"));
     client.println("Host: " + String(host));
-    client.println("Connection: close");
-    client.println(); 
+    client.println(F("Content-Type: application/json"));
+    client.println("Content-Length: " + String(queryString.length()));
+    client.println(F("Connection: close"));
+    client.println(F(""));
+    client.println(queryString);
+    client.println(F(""));
     
     client.flush();
     client.stop();
@@ -96,7 +100,7 @@ void readSensor() {
   float t = dht.readTemperature(); // Le temperatura
 
   if (isnan(h) || isnan(t)) {
-    Serial.println("Sensor fail");
+    Serial.println(F("Fail"));
     return;
   }
 
@@ -106,7 +110,7 @@ void readSensor() {
 
 void setupEthernetShield() {
 
-  Serial.println("Start Ethernet");
+  Serial.println(F("Start Ethernet"));
   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };//mac ethernet shield
   if (Ethernet.begin(mac) == 0) {
     while(true);
@@ -148,7 +152,7 @@ void readFile() {
   
   pinMode(10,OUTPUT); 
 
-  Serial.println("Start SD");
+  Serial.println(F("Start SD"));
   // Initialize the SD.
   if (!sd.begin(SD_CONFIG)) {
     sd.initErrorHalt(&Serial);
@@ -158,7 +162,7 @@ void readFile() {
 
   // Create the file.
   if (!file.open("config.txt", FILE_READ)) {
-    Serial.println("open fail");
+    Serial.println(F("open fail"));
     sd.end();
     return;
   }
@@ -166,13 +170,13 @@ void readFile() {
   while (file.available()) {
     int n = file.fgets(line, sizeof(line));
     if (n <= 0) {
-      Serial.println("fgets fail");
+      Serial.println(F("fgets fail"));
     }
     if (line[n-1] != '\n' && n == (sizeof(line) - 1)) {
-      Serial.println("line so long");
+      Serial.println(F("line so long"));
     }
     if (!parseLine(line)) {
-      Serial.println("parse failed");
+      Serial.println(F("parse failed"));
     }
   }
   
@@ -183,13 +187,13 @@ void readFile() {
 void setup() {
   Serial.begin(9600);
   while (!Serial){;}
-  Serial.println("Starting");
+  Serial.println(F("Starting"));
   
   setupEthernetShield();
   readFile();
   dht.begin();
   
-  Serial.println("Setup Finished");
+  Serial.println(F("Setup Finished"));
 }
 
 
