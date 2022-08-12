@@ -57,6 +57,10 @@ String SERVER_ADDR; //Server address
 String RASP_ADDR; //Raspberry hostname
 
 void sendRasp(float h, float t) {
+  if(RASP_ADDR == NULL) {
+    Serial.println(F("Raspberry not configured"));
+    return;
+  }
   int str_len = RASP_ADDR.length() + 1; 
   char addr[str_len];
   RASP_ADDR.toCharArray(addr, str_len);
@@ -64,6 +68,10 @@ void sendRasp(float h, float t) {
 }
 
 void sendServer(float h, float t) {
+  if(SERVER_ADDR == NULL) {
+    Serial.println(F("Server address not configured"));
+    return;
+  }
   int str_len = SERVER_ADDR.length() + 1; 
   char addr[str_len];
   SERVER_ADDR.toCharArray(addr, str_len);
