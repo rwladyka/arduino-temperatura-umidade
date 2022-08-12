@@ -76,20 +76,19 @@ void request(float h, float t, char host[]) {
   digitalWrite(10, HIGH); // select ethernet mode
 
   if (client.connect(host, 80)) {
-    String queryString = "{ \"id\": \"" + ID + "\", \"u\": " + String(h) + ", \"t\": " + String(t) + " }";
+    String json = "{ \"id\": \"" + ID + "\", \"u\": " + String(h) + ", \"t\": " + String(t) + " }";
 
     Serial.println(host);
-    Serial.println(queryString);
-    client.println(F("POST /temperaturas/informar"));
+    Serial.println(json);
+    client.println(F("POST /temperaturas/informar HTTP/1.1"));
     client.println("Host: " + String(host));
-    client.println(F("Content-Type: application/json"));
-    client.println("Content-Length: " + String(queryString.length()));
+    client.println(F("Content-Type: application/json;"));
+    client.println(F("User-Agent: Arduino/1.0"));
+    client.println("Content-Length: " + String(json.length() + 1));
     client.println(F("Connection: close"));
     client.println(F(""));
-    client.println(queryString);
-    client.println(F(""));
-    
-    client.flush();
+    client.println(json);
+
     client.stop();
   }
 }
