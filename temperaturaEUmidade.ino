@@ -1,13 +1,14 @@
 
 #include <SPI.h>
 #include <Ethernet.h>
-#include <DHT.h>
+#include <OneWire.h>  
+#include <DallasTemperature.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
 
 #define W5100_CS  10
-#define DHTPIN 7        // Pino digital conectado
-#define DHTTYPE DHT22   // DHT 22, AM2302, AM2321
+#define SENSOR1 7        // Pino digital conectado
+#define SENSOR2 8        // Pino digital conectado
 
 // DEFINIÇÕES DISPLAY
 #define endereco  0x27 // Endereços comuns: 0x27, 0x3F
@@ -15,27 +16,32 @@
 #define linhas    2
 
 // INSTANCIANDO OBJETOS
-DHT dht(DHTPIN, DHTTYPE, 11);
 EthernetClient client;
 LiquidCrystal_I2C lcd(endereco, colunas, linhas);
+OneWire oneWire1(SENSOR1);
+OneWire oneWire2(SENSOR2);
+DallasTemperature sensors1(&oneWire1);
+DallasTemperature sensors2(&oneWire2);
 
 // Constantes
-String ID = "0262119";
+String ID = "262121";
 String SERVER_ADDR = "homologacao.gestox.com.br"; //Server address
-//String RASP_ADDR; //Raspberry hostname
+String RASP_ADDR = "192.168.100.123"; //Raspberry hostname
+int RASP_PORT;
 
-//void sendRasp(float h, float t) {
-//  if(RASP_ADDR == NULL) {
-//    Serial.println(F("Raspberry not configured"));
-//    return;
-//  }
-//  int str_len = RASP_ADDR.length() + 1; 
-//  char addr[str_len];
-//  RASP_ADDR.toCharArray(addr, str_len);
-//  request(h, t, addr);  
-//}
+void sendRasp(float t1, float t2) {
+  if(RASP_ADDR == NULL) {
+    Serial.println(F("Raspberry not configured"));
+    return;
+  } 
+ 
+  int str_len = RASP_ADDR.length() + 1; 
+  char addr[str_len];
+  RASP_ADDR.toCharArray(addr, str_len);
+  request(t1, t2, addr, 7500);  
+}
 
-void sendServer(float h, float t) {
+void sendServer(float t1, float t2) {
   if(SERVER_ADDR == NULL) {
     Serial.println(F("Server address not configured"));
     return;
@@ -43,16 +49,16 @@ void sendServer(float h, float t) {
   int str_len = SERVER_ADDR.length() + 1; 
   char addr[str_len];
   SERVER_ADDR.toCharArray(addr, str_len);
-  request(h, t, addr);  
+  request(t1, t2, addr, 80);  
 }
 
-void request(float h, float t, char host[]) {
+void request(float t1, float t2, char host[], int port) {
   
   pinMode(4,OUTPUT); 
   digitalWrite(10, HIGH); // select ethernet mode
 
-  if (client.connect(host, 80)) {
-    String json = "{ \"id\": \"" + ID + "\", \"u\": " + String(h) + ", \"t\": " + String(t) + " }";
+  if (client.connect(host, port)) {
+    String json = "{ \"name\": \"" + ID + "\", \"t2\": " + String(t2) + ", \"t1\": " + String(t1) + " }";
 
     Serial.println(host);
     Serial.println(json);
@@ -71,18 +77,23 @@ void request(float h, float t, char host[]) {
 
 
 void readSensor() {
-  lcd.print("T: 15, U: 10");
-  Serial.println("T: 15, U: 10");
-  float h = dht.readHumidity(); // Le umidade
-  float t = dht.readTemperature(); // Le temperatura
+  sensors1.requestTemperatures();
+  sensors2.requestTemperatures();
+  float t1 = sensors1.getTempCByIndex(0); // Le temperatura
+  float t2 = sensors2.getTempCByIndex(0); // Le temperatura
 
-  if (isnan(h) || isnan(t)) {
+  if (isnan(t1) || isnan(t2)) {
     Serial.println(F("Fail"));
     return;
   }
 
-//  sendRasp(h, t);
-  sendServer(h, t);
+  lcd.print(F("T1:"));
+  lcd.print(t1);
+  lcd.print(F(" T2:"));
+  lcd.print(t2);
+
+  sendRasp(t1, t2);
+  sendServer(t1, t2);
 }
 
 void setupEthernetShield() {
@@ -111,7 +122,8 @@ void setup() {
   lcd.print(F("Starting..."));
   
   setupEthernetShield();
-  dht.begin();
+  sensors1.begin();
+  sensors2.begin();
   
   lcd.clear();
   Serial.println(F("Setup Finished"));
@@ -124,7 +136,7 @@ void setup() {
 
 
 void loop() {
-  delay(6000);
+  delay(60000);
   lcd.setCursor(0, 1); // POSICIONA O CURSOR NA PRIMEIRA COLUNA DA LINHA 2
   readSensor();
 }
