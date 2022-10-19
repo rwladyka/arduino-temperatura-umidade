@@ -1,3 +1,13 @@
+/*
+ * v0.11 - 19/10/2022
+ *   - 2 sensores DS18B20
+ *   - Exibe IP arduino e temperaturas no display LCD
+ *   - Consulta configurações raspberry no setup
+ *   - Consulta configurações raspberry se necessário no loop
+ *   - Servidor de consulta
+ *   - Servidor de envio
+ *   - Envio Local (Raspberry)
+*/
 
 #include <SPI.h>
 #include <Ethernet.h>
@@ -29,14 +39,15 @@ StaticJsonDocument<200> doc;
 String ID = "262121";
 char SERVER_ADDR[] = "homologacao.gestox.com.br"; //Server address
 int SERVER_PORT = 80;
+char SERVER_QUERY[] = "homologacao.gestox.com.br"; //Server address
+int SERVER_QUERY_PORT = 80;
 String RASP_ADDR; //Raspberry hostname
 int RASP_PORT;
 const unsigned int HTTP_TIMEOUT = 1000;
 
 
 
-void sendRasp(float t1, float t2) {
-  configRaspberry();
+void sendRasp(float t1, float t2, boolean retry) {
   if(RASP_ADDR == NULL) {
     Serial.println(F("Raspberry not configured"));
     return;
@@ -45,7 +56,7 @@ void sendRasp(float t1, float t2) {
   int str_len = RASP_ADDR.length() + 1; 
   char addr[str_len];
   RASP_ADDR.toCharArray(addr, str_len);
-  request(t1, t2, addr, RASP_PORT);  
+  request(t1, t2, addr, RASP_PORT, retry);  
 }
 
 void sendServer(float t1, float t2) {
@@ -53,10 +64,10 @@ void sendServer(float t1, float t2) {
     Serial.println(F("Server address not configured"));
     return;
   }
-  request(t1, t2, SERVER_ADDR, SERVER_PORT);  
+  request(t1, t2, SERVER_ADDR, SERVER_PORT, false);  
 }
 
-void request(float t1, float t2, char host[], int port) {
+void request(float t1, float t2, char host[], int port, boolean retry) {
   Serial.print(host);
   Serial.print(F(":"));
   Serial.println(port);
@@ -74,12 +85,16 @@ void request(float t1, float t2, char host[], int port) {
 
     client.stop();
   } else {
-    Serial.println(F("Connection Faild"));  
+    if (retry) {
+      configRaspberry();
+      sendRasp(t1, t2, false);
+    }
+    Serial.println(F("Connection Failed"));  
   }
 }
 
 void configRaspberry() {
-  if (client.connect(SERVER_ADDR, SERVER_PORT)) {
+  if (client.connect(SERVER_QUERY, SERVER_QUERY_PORT)) {
     char c[128];
 
     Serial.println(F("Getting Raspberry configs"));
@@ -136,7 +151,7 @@ void readSensor() {
   lcd.print(t2);
 
   sendServer(t1, t2);
-  sendRasp(t1, t2);
+  sendRasp(t1, t2, true);
 }
 
 void setupEthernetShield() {
@@ -180,7 +195,7 @@ void setup() {
 
 
 void loop() {
-  delay(6000);
+  delay(60000);
   lcd.setCursor(0, 1); // POSICIONA O CURSOR NA PRIMEIRA COLUNA DA LINHA 2
   readSensor();
 }
