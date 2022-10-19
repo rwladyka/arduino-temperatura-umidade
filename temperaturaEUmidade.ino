@@ -5,6 +5,7 @@
 #include <DallasTemperature.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <ArduinoJson.h>
 
 #define W5100_CS  10
 #define SENSOR1 7        // Pino digital conectado
@@ -22,14 +23,20 @@ OneWire oneWire1(SENSOR1);
 OneWire oneWire2(SENSOR2);
 DallasTemperature sensors1(&oneWire1);
 DallasTemperature sensors2(&oneWire2);
+StaticJsonDocument<200> doc;
 
 // Constantes
 String ID = "262121";
-String SERVER_ADDR = "homologacao.gestox.com.br"; //Server address
-String RASP_ADDR = "192.168.100.123"; //Raspberry hostname
+char SERVER_ADDR[] = "homologacao.gestox.com.br"; //Server address
+int SERVER_PORT = 80;
+String RASP_ADDR; //Raspberry hostname
 int RASP_PORT;
+const unsigned int HTTP_TIMEOUT = 1000;
+
+
 
 void sendRasp(float t1, float t2) {
+  configRaspberry();
   if(RASP_ADDR == NULL) {
     Serial.println(F("Raspberry not configured"));
     return;
@@ -38,7 +45,7 @@ void sendRasp(float t1, float t2) {
   int str_len = RASP_ADDR.length() + 1; 
   char addr[str_len];
   RASP_ADDR.toCharArray(addr, str_len);
-  request(t1, t2, addr, 7500);  
+  request(t1, t2, addr, RASP_PORT);  
 }
 
 void sendServer(float t1, float t2) {
@@ -46,35 +53,71 @@ void sendServer(float t1, float t2) {
     Serial.println(F("Server address not configured"));
     return;
   }
-  int str_len = SERVER_ADDR.length() + 1; 
-  char addr[str_len];
-  SERVER_ADDR.toCharArray(addr, str_len);
-  request(t1, t2, addr, 80);  
+  request(t1, t2, SERVER_ADDR, SERVER_PORT);  
 }
 
 void request(float t1, float t2, char host[], int port) {
-  
-  pinMode(4,OUTPUT); 
-  digitalWrite(10, HIGH); // select ethernet mode
-
+  Serial.print(host);
+  Serial.print(F(":"));
+  Serial.println(port);
   if (client.connect(host, port)) {
-    String json = "{ \"name\": \"" + ID + "\", \"t2\": " + String(t2) + ", \"t1\": " + String(t1) + " }";
+    String json = "{ \"arduino\": \"" + ID + "\", \"t1\": " + String(t1) + ", \"t2\": " + String(t2) + "\" }";
 
-    Serial.println(host);
     Serial.println(json);
     client.println(F("POST /temperaturas/informar HTTP/1.1"));
     client.println("Host: " + String(host));
     client.println(F("Content-Type: application/json;"));
-    client.println(F("User-Agent: Arduino/1.0"));
     client.println("Content-Length: " + String(json.length() + 1));
     client.println(F("Connection: close"));
     client.println(F(""));
     client.println(json);
 
     client.stop();
+  } else {
+    Serial.println(F("Connection Faild"));  
   }
 }
 
+void configRaspberry() {
+  if (client.connect(SERVER_ADDR, SERVER_PORT)) {
+    char c[128];
+
+    Serial.println(F("Getting Raspberry configs"));
+    client.print(F("GET /temperaturas/config-arduino/"));
+    client.print(ID);
+    client.println(F(" HTTP/1.1"));
+    client.println("Host: " + String(SERVER_ADDR));
+    client.println(F("Connection: close"));
+    client.println();
+    client.setTimeout(HTTP_TIMEOUT);
+
+    char endOfHeaders[] = "\r\n\r\n";
+    client.find(endOfHeaders);
+    
+    int index = 0;
+    boolean started = false;
+
+    while(client.available()) {
+      char ch = client.read();
+      if (!started && ch == '{') started = true;
+      if (started) {
+        c[index] = ch;
+        index++;
+      }
+      if (ch == '}')break;
+      
+    };
+
+    deserializeJson(doc, c);
+    const char* ip = doc["ip"];
+    String port = doc["porta"];
+    
+    if (ip != NULL) RASP_ADDR = String(ip);
+    if (port != NULL) RASP_PORT = port.toInt();
+
+    client.stop();
+  }
+}
 
 void readSensor() {
   sensors1.requestTemperatures();
@@ -92,8 +135,8 @@ void readSensor() {
   lcd.print(F(" T2:"));
   lcd.print(t2);
 
-  sendRasp(t1, t2);
   sendServer(t1, t2);
+  sendRasp(t1, t2);
 }
 
 void setupEthernetShield() {
@@ -132,11 +175,12 @@ void setup() {
   lcd.clear();
   lcd.print(F("IP: "));
   lcd.print(Ethernet.localIP());
+  configRaspberry();
 }
 
 
 void loop() {
-  delay(60000);
+  delay(6000);
   lcd.setCursor(0, 1); // POSICIONA O CURSOR NA PRIMEIRA COLUNA DA LINHA 2
   readSensor();
 }
