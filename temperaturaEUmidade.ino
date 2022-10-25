@@ -1,5 +1,5 @@
 /*
- * v0.11 - 19/10/2022
+ * v0.12 - 25/10/2022
  *   - 2 sensores DS18B20
  *   - Exibe IP arduino e temperaturas no display LCD
  *   - Consulta configurações raspberry no setup
@@ -7,6 +7,7 @@
  *   - Servidor de consulta
  *   - Servidor de envio
  *   - Envio Local (Raspberry)
+ *   - Printa IP Raspberry no display
 */
 
 #include <SPI.h>
@@ -57,6 +58,15 @@ void sendRasp(float t1, float t2, boolean retry) {
   char addr[str_len];
   RASP_ADDR.toCharArray(addr, str_len);
   request(t1, t2, addr, RASP_PORT, retry);  
+}
+
+void printRaspIP() {
+  if(RASP_ADDR != NULL) {
+    lcd.setCursor(0, 1);
+    lcd.print(F("R: "));
+    lcd.print(RASP_ADDR);
+  }
+  
 }
 
 void sendServer(float t1, float t2) {
@@ -131,6 +141,7 @@ void configRaspberry() {
     if (port != NULL) RASP_PORT = port.toInt();
 
     client.stop();
+    printRaspIP();
   }
 }
 
@@ -190,7 +201,8 @@ void setup() {
   lcd.clear();
   lcd.print(F("IP: "));
   lcd.print(Ethernet.localIP());
-  configRaspberry();
+  delay(3000);
+  configRaspberry();  
 }
 
 
