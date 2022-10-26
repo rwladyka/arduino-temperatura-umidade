@@ -8,6 +8,7 @@
  *   - Servidor de envio
  *   - Envio Local (Raspberry)
  *   - Printa IP Raspberry no display
+ *   - Corrige formato json
 */
 
 #include <SPI.h>
@@ -62,11 +63,11 @@ void sendRasp(float t1, float t2, boolean retry) {
 
 void printRaspIP() {
   if(RASP_ADDR != NULL) {
-    lcd.setCursor(0, 1);
+    lcd.setCursor(0, 0);
     lcd.print(F("R: "));
     lcd.print(RASP_ADDR);
+    lcd.setCursor(0, 1);
   }
-  
 }
 
 void sendServer(float t1, float t2) {
@@ -82,7 +83,7 @@ void request(float t1, float t2, char host[], int port, boolean retry) {
   Serial.print(F(":"));
   Serial.println(port);
   if (client.connect(host, port)) {
-    String json = "{ \"arduino\": \"" + ID + "\", \"t1\": " + String(t1) + ", \"t2\": " + String(t2) + "\" }";
+    String json = "{ \"arduino\": " + ID + ", \"t1\": " + String(t1) + ", \"t2\": " + String(t2) + " }";
 
     Serial.println(json);
     client.println(F("POST /temperaturas/informar HTTP/1.1"));
