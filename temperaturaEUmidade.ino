@@ -1,5 +1,5 @@
 /*
- * v0.13 - 05/12/2022
+ * v0.14 - 09/12/2022
  *   - 2 sensores DS18B20
  *   - Exibe IP arduino e temperaturas no display LCD
  *   - Consulta configurações raspberry no setup
@@ -10,6 +10,7 @@
  *   - Printa IP Raspberry no display
  *   - Corrige formato json
  *   - Faz leitura dos sensores sem ethernet
+ *   - Tenta reconectar se não tiver conexão.
 */
 
 #include <SPI.h>
@@ -49,6 +50,8 @@ int RASP_PORT;
 const unsigned int HTTP_TIMEOUT = 1000;
 
 
+// CONFIGS
+bool RETRY_CONNECTION = true;
 
 void sendRasp(float t1, float t2, boolean retry) {
   if(RASP_ADDR == NULL) {
@@ -167,21 +170,30 @@ void readSensor() {
   sendRasp(t1, t2, true);
 }
 
+bool isLinkOn(){
+  return Ethernet.localIP() == "0.0.0.0";
+}
+
 void setupEthernetShield() {
   lcd.clear();
   lcd.println(F("Iniciando rede"));
   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };//mac ethernet shield
+  Ethernet.begin(mac);
   printEth();
 }
 
 void printEth() {
   lcd.clear();
-  if (Ethernet.linkStatus() == LinkOFF) {
-    lcd.println(F("Sem Rede"));
-  } else {
+  if (isLinkOn()) {
+    
+    Serial.println(Ethernet.localIP());
     lcd.print(F("IP: "));
     lcd.print(Ethernet.localIP());
     delay(3000);
+  } else {
+    
+    Serial.println(F("Sem Rede"));
+    lcd.println(F("Sem Conexão"));
   }
 }
 
@@ -208,15 +220,15 @@ void setup() {
   lcd.print(F("Setup Finalizado"));
   delay(1000);
   printEth();
-  if (Ethernet.linkStatus() != LinkOFF) {
+  if (isLinkOn()) {
     configRaspberry();  
-  }
+  } 
 }
 
 
 void loop() {
   delay(60000);
-  if (Ethernet.linkStatus() == LinkOFF) {
+  if (!isLinkOn() && RETRY_CONNECTION) {
     setupEthernetShield();
   }
   lcd.setCursor(0, 1); // POSICIONA O CURSOR NA PRIMEIRA COLUNA DA LINHA 2
