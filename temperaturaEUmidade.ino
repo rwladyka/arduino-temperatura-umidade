@@ -1,5 +1,5 @@
 /*
- * v0.14 - 09/12/2022
+ * v0.15.3 - 16/12/2022
  *   - 2 sensores DS18B20
  *   - Exibe IP arduino e temperaturas no display LCD
  *   - Consulta configurações raspberry no setup
@@ -11,6 +11,9 @@
  *   - Corrige formato json
  *   - Faz leitura dos sensores sem ethernet
  *   - Tenta reconectar se não tiver conexão.
+ *   - Atualiza mensagem de conexão.
+ *   - Se tiver conexão raspberry, não envia pro web.
+ *   - Leitura inicial da temperatura.
 */
 
 #include <SPI.h>
@@ -51,7 +54,7 @@ const unsigned int HTTP_TIMEOUT = 1000;
 
 
 // CONFIGS
-bool RETRY_CONNECTION = true;
+bool RETRY_CONNECTION = false;
 
 void sendRasp(float t1, float t2, boolean retry) {
   if(RASP_ADDR == NULL) {
@@ -141,8 +144,13 @@ void configRaspberry() {
     deserializeJson(doc, c);
     const char* ip = doc["ip"];
     String port = doc["porta"];
-    
-    if (ip != NULL) RASP_ADDR = String(ip);
+    lcd.clear();
+    if (ip != NULL) {
+      RASP_ADDR = String(ip);
+      lcd.println(F("Envio Local"));
+    } else {
+      lcd.println(F("Envio Web"));
+    }
     if (port != NULL) RASP_PORT = port.toInt();
 
     client.stop();
@@ -165,13 +173,20 @@ void readSensor() {
   lcd.print(t1);
   lcd.print(F(" T2:"));
   lcd.print(t2);
+  Serial.print(F("T1:"));
+  Serial.print(t1);
+  Serial.print(F(" T2:"));
+  Serial.println(t2);
 
-  sendServer(t1, t2);
-  sendRasp(t1, t2, true);
+  if(RASP_ADDR != NULL) {
+    sendRasp(t1, t2, true);
+  } else if(!isLinkOff()) {
+    sendServer(t1, t2);
+  }
 }
 
-bool isLinkOn(){
-  return Ethernet.localIP() == "0.0.0.0";
+bool isLinkOff(){
+  return Ethernet.localIP() == IPAddress({0,0,0,0});
 }
 
 void setupEthernetShield() {
@@ -184,16 +199,14 @@ void setupEthernetShield() {
 
 void printEth() {
   lcd.clear();
-  if (isLinkOn()) {
-    
+  if (isLinkOff()) {
+    Serial.println(F("Sem Rede"));
+    lcd.println(F("Sem Rede"));
+  } else {
     Serial.println(Ethernet.localIP());
     lcd.print(F("IP: "));
     lcd.print(Ethernet.localIP());
-    delay(3000);
-  } else {
-    
-    Serial.println(F("Sem Rede"));
-    lcd.println(F("Sem Conexão"));
+    delay(2000);
   }
 }
 
@@ -220,15 +233,17 @@ void setup() {
   lcd.print(F("Setup Finalizado"));
   delay(1000);
   printEth();
-  if (isLinkOn()) {
+  if (!isLinkOff()) {
     configRaspberry();  
-  } 
+  }
+
+  readSensor();
 }
 
 
 void loop() {
   delay(60000);
-  if (!isLinkOn() && RETRY_CONNECTION) {
+  if (isLinkOff() && RETRY_CONNECTION) {
     setupEthernetShield();
   }
   lcd.setCursor(0, 1); // POSICIONA O CURSOR NA PRIMEIRA COLUNA DA LINHA 2
