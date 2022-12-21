@@ -1,5 +1,5 @@
 /*
- * v0.15.3 - 16/12/2022
+ * v0.15.5 - 21/12/2022
  *   - 2 sensores DS18B20
  *   - Exibe IP arduino e temperaturas no display LCD
  *   - Consulta configurações raspberry no setup
@@ -14,6 +14,7 @@
  *   - Atualiza mensagem de conexão.
  *   - Se tiver conexão raspberry, não envia pro web.
  *   - Leitura inicial da temperatura.
+ *   - Corrige informação conexão
 */
 
 #include <SPI.h>
@@ -49,15 +50,16 @@ int SERVER_PORT = 80;
 char SERVER_QUERY[] = "homologacao.gestox.com.br"; //Server address
 int SERVER_QUERY_PORT = 80;
 String RASP_ADDR; //Raspberry hostname
+String INVALID_IP = "0.0.0.0";
 int RASP_PORT;
 const unsigned int HTTP_TIMEOUT = 1000;
 
 
 // CONFIGS
-bool RETRY_CONNECTION = false;
+bool RETRY_CONNECTION = true;
 
-void sendRasp(float t1, float t2, boolean retry) {
-  if(RASP_ADDR == NULL) {
+void sendRasp(float t1, float t2) {
+  if(!hasRaspberryIP()) {
     Serial.println(F("Raspberry not configured"));
     return;
   } 
@@ -65,11 +67,11 @@ void sendRasp(float t1, float t2, boolean retry) {
   int str_len = RASP_ADDR.length() + 1; 
   char addr[str_len];
   RASP_ADDR.toCharArray(addr, str_len);
-  request(t1, t2, addr, RASP_PORT, retry);  
+  request(t1, t2, addr, RASP_PORT);  
 }
 
 void printRaspIP() {
-  if(RASP_ADDR != NULL) {
+  if(hasRaspberryIP()) {
     lcd.setCursor(0, 0);
     lcd.print(F("R: "));
     lcd.print(RASP_ADDR);
@@ -77,15 +79,19 @@ void printRaspIP() {
   }
 }
 
+bool hasRaspberryIP() {
+  return RASP_ADDR != NULL && RASP_ADDR != INVALID_IP;
+}
+
 void sendServer(float t1, float t2) {
   if(SERVER_ADDR == NULL) {
     Serial.println(F("Server address not configured"));
     return;
   }
-  request(t1, t2, SERVER_ADDR, SERVER_PORT, false);  
+  request(t1, t2, SERVER_ADDR, SERVER_PORT);  
 }
 
-void request(float t1, float t2, char host[], int port, boolean retry) {
+void request(float t1, float t2, char host[], int port) {
   Serial.print(host);
   Serial.print(F(":"));
   Serial.println(port);
@@ -103,11 +109,11 @@ void request(float t1, float t2, char host[], int port, boolean retry) {
 
     client.stop();
   } else {
-    if (retry) {
-      configRaspberry();
-      sendRasp(t1, t2, false);
-    }
-    Serial.println(F("Connection Failed"));  
+    Serial.println(F("Connection Failed")); 
+
+    if (RETRY_CONNECTION) {
+      setupEthernetShield();
+    } 
   }
 }
 
@@ -145,10 +151,11 @@ void configRaspberry() {
     const char* ip = doc["ip"];
     String port = doc["porta"];
     lcd.clear();
-    if (ip != NULL) {
+    if (ip != NULL && String(ip) != INVALID_IP) {
       RASP_ADDR = String(ip);
       lcd.println(F("Envio Local"));
     } else {
+      RASP_ADDR = INVALID_IP;
       lcd.println(F("Envio Web"));
     }
     if (port != NULL) RASP_PORT = port.toInt();
@@ -178,8 +185,8 @@ void readSensor() {
   Serial.print(F(" T2:"));
   Serial.println(t2);
 
-  if(RASP_ADDR != NULL) {
-    sendRasp(t1, t2, true);
+  if(hasRaspberryIP()) {
+    sendRasp(t1, t2);
   } else if(!isLinkOff()) {
     sendServer(t1, t2);
   }
@@ -194,7 +201,11 @@ void setupEthernetShield() {
   lcd.println(F("Iniciando rede"));
   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };//mac ethernet shield
   Ethernet.begin(mac);
+  delay(2000);
   printEth();
+  if (!isLinkOff()) {
+    configRaspberry();
+  }
 }
 
 void printEth() {
@@ -233,9 +244,6 @@ void setup() {
   lcd.print(F("Setup Finalizado"));
   delay(1000);
   printEth();
-  if (!isLinkOff()) {
-    configRaspberry();  
-  }
 
   readSensor();
 }
