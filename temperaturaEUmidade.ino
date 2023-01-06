@@ -1,5 +1,6 @@
 /*
- * v0.15.6 - 23/12/2022
+ *
+ * v0.15.7 - 06/01/2023
  *   - 2 sensores DS18B20
  *   - Exibe IP arduino e temperaturas no display LCD
  *   - Consulta configurações raspberry no setup
@@ -16,6 +17,8 @@
  *   - Leitura inicial da temperatura.
  *   - Corrige informação conexão.
  *   - Define tipo de execução única (LOCAL, RASPBERRY, WEB).
+ *   - Corrige informação conexão.
+ *
 */
 
 #include <SPI.h>
@@ -61,8 +64,8 @@ enum ExecutionType {
 
 // CONFIGS
 //ExecutionType EXECUTION = LOCAL;
-ExecutionType EXECUTION = RASPBERRY;
-// ExecutionType EXECUTION = WEB;
+//ExecutionType EXECUTION = RASPBERRY;
+ ExecutionType EXECUTION = WEB;
 
 bool isLocalExecution() {
   return EXECUTION == LOCAL;
@@ -121,7 +124,12 @@ void request(float t1, float t2, char host[], int port) {
 
     client.stop();
   } else {
+    lcd.setCursor(0, 1);
+    lcd.print(F("Falha no Envio"));
     Serial.println(F("Connection Failed")); 
+    if (!isLinkOff()) {
+      setupEthernetShield();
+    }
   }
 }
 
@@ -191,6 +199,8 @@ void readSensor() {
   Serial.print(F(" T2:"));
   Serial.println(t2);
 
+  if (isLinkOff()) return;
+
   if(isRaspberryExecution()) {
     sendRasp(t1, t2);
   } else if(isWebExecution()) {
@@ -203,13 +213,11 @@ bool isLinkOff(){
 }
 
 void setupEthernetShield() {
-  lcd.clear();
-  
   if (isLocalExecution()){
     printNoEth();
     return;
   }
-  lcd.println(F("Iniciando rede"));
+  
   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };//mac ethernet shield
   Ethernet.begin(mac);
   delay(2000);
@@ -261,7 +269,9 @@ void setup() {
   
   sensors1.begin();
   sensors2.begin();
-  
+
+  lcd.clear();
+  lcd.println(F("Iniciando rede"));
   setupEthernetShield();
   delay(1000);
 
@@ -270,7 +280,7 @@ void setup() {
 
 
 void loop() {
-  delay(6000);
+  delay(60000);
   if (!isLocalExecution() && isLinkOff()) {
     setupEthernetShield();
   }
