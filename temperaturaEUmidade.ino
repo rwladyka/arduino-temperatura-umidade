@@ -1,6 +1,6 @@
 /*
  *
- * v0.15.7 - 06/01/2023
+ * v0.15.8 - 11/01/2023
  *   - 2 sensores DS18B20
  *   - Exibe IP arduino e temperaturas no display LCD
  *   - Consulta configurações raspberry no setup
@@ -18,6 +18,7 @@
  *   - Corrige informação conexão.
  *   - Define tipo de execução única (LOCAL, RASPBERRY, WEB).
  *   - Corrige informação conexão.
+ *   - Corrige informação conexão Raspberry.
  *
 */
 
@@ -64,8 +65,8 @@ enum ExecutionType {
 
 // CONFIGS
 //ExecutionType EXECUTION = LOCAL;
-//ExecutionType EXECUTION = RASPBERRY;
- ExecutionType EXECUTION = WEB;
+ExecutionType EXECUTION = RASPBERRY;
+//  ExecutionType EXECUTION = WEB;
 
 bool isLocalExecution() {
   return EXECUTION == LOCAL;
@@ -89,7 +90,6 @@ void sendRasp(float t1, float t2) {
     Serial.print(F("Raspberry IP: "));
     Serial.println(RASP_ADDR);
     configRaspberry();
-    if(!hasRaspberryIP()) return;
   } 
  
   int str_len = RASP_ADDR.length() + 1; 
