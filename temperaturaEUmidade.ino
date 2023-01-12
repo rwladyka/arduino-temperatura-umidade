@@ -1,6 +1,6 @@
 /*
  *
- * v0.15.8 - 11/01/2023
+ * v0.15.9 - 12/01/2023
  *   - 2 sensores DS18B20
  *   - Exibe IP arduino e temperaturas no display LCD
  *   - Consulta configurações raspberry no setup
@@ -19,6 +19,7 @@
  *   - Define tipo de execução única (LOCAL, RASPBERRY, WEB).
  *   - Corrige informação conexão.
  *   - Corrige informação conexão Raspberry.
+ *   - Corrige reconexão Raspberry.
  *
 */
 
@@ -86,11 +87,9 @@ bool hasRaspberryIP() {
 
 void sendRasp(float t1, float t2) {
   if(!hasRaspberryIP()) {
-    Serial.println(F("Raspberry não configurado ou IP Inválido"));
-    Serial.print(F("Raspberry IP: "));
-    Serial.println(RASP_ADDR);
-    configRaspberry();
-  } 
+    Serial.println(F("Raspberry não configurado"));
+    return;
+  }
  
   int str_len = RASP_ADDR.length() + 1; 
   char addr[str_len];
@@ -174,7 +173,13 @@ void configRaspberry() {
     if (port != NULL) RASP_PORT = port.toInt();
 
     client.stop();
-  }
+  } else {
+    lcd.setCursor(0, 1);
+    lcd.print(F("Falha cfg Rasp"));
+    Serial.println(F("Falha ao pegar config Raspberry")); 
+    if (!isLinkOff()) {
+      setupEthernetShield();
+    }
 }
 
 void readSensor() {
@@ -221,7 +226,7 @@ void setupEthernetShield() {
   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };//mac ethernet shield
   Ethernet.begin(mac);
   delay(2000);
-  if (isRaspberryExecution() && !isLinkOff()) {
+  if (isRaspberryExecution() && (!hasRaspberryIP() || !isLinkOff())) {
     configRaspberry();
   }
   
@@ -281,7 +286,7 @@ void setup() {
 
 void loop() {
   delay(60000);
-  if (!isLocalExecution() && isLinkOff()) {
+  if (!isLocalExecution() && (isLinkOff() || (isRaspberryExecution() && !hasRaspberryIP()))) {
     setupEthernetShield();
   }
 
