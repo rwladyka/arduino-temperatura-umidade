@@ -86,10 +86,10 @@ bool hasRaspberryIP() {
 }
 
 void sendRasp(float t1, float t2) {
-  if(!hasRaspberryIP()) {
-    Serial.println(F("Raspberry não configurado"));
-    return;
-  }
+ if(!hasRaspberryIP()) {
+   Serial.println(F("Raspberry não configurado"));
+   return;
+ }
  
   int str_len = RASP_ADDR.length() + 1; 
   char addr[str_len];
@@ -180,6 +180,7 @@ void configRaspberry() {
     if (!isLinkOff()) {
       setupEthernetShield();
     }
+  }
 }
 
 void readSensor() {
