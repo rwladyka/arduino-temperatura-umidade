@@ -1,6 +1,6 @@
 /*
  *
- * v0.15.9 - 12/01/2023
+ * v0.15.10 - 13/01/2023
  *   - 2 sensores DS18B20
  *   - Exibe IP arduino e temperaturas no display LCD
  *   - Consulta configurações raspberry no setup
@@ -69,6 +69,10 @@ enum ExecutionType {
 ExecutionType EXECUTION = RASPBERRY;
 //  ExecutionType EXECUTION = WEB;
 
+bool isLinkOff(){
+  return Ethernet.localIP() == IPAddress({0,0,0,0});
+}
+
 bool isLocalExecution() {
   return EXECUTION == LOCAL;
 }
@@ -123,13 +127,12 @@ void request(float t1, float t2, char host[], int port) {
 
     client.stop();
   } else {
-    lcd.setCursor(0, 1);
-    lcd.print(F("Falha no Envio"));
     Serial.println(F("Connection Failed")); 
     if (!isLinkOff()) {
       setupEthernetShield();
     }
   }
+ return;
 }
 
 void configRaspberry() {
@@ -173,13 +176,6 @@ void configRaspberry() {
     if (port != NULL) RASP_PORT = port.toInt();
 
     client.stop();
-  } else {
-    lcd.setCursor(0, 1);
-    lcd.print(F("Falha cfg Rasp"));
-    Serial.println(F("Falha ao pegar config Raspberry")); 
-    if (!isLinkOff()) {
-      setupEthernetShield();
-    }
   }
 }
 
@@ -190,11 +186,6 @@ void readSensor() {
   float t1 = sensors1.getTempCByIndex(0); // Le temperatura
   float t2 = sensors2.getTempCByIndex(0); // Le temperatura
 
-  if (isnan(t1) || isnan(t2)) {
-    Serial.println(F("Fail"));
-    return;
-  }
-
   lcd.print(F("T1:"));
   lcd.print(t1);
   lcd.print(F(" T2:"));
@@ -204,7 +195,7 @@ void readSensor() {
   Serial.print(t1);
   Serial.print(F(" T2:"));
   Serial.println(t2);
-
+  
   if (isLinkOff()) return;
 
   if(isRaspberryExecution()) {
@@ -212,10 +203,6 @@ void readSensor() {
   } else if(isWebExecution()) {
     sendServer(t1, t2);
   }
-}
-
-bool isLinkOff(){
-  return Ethernet.localIP() == IPAddress({0,0,0,0});
 }
 
 void setupEthernetShield() {
@@ -227,7 +214,7 @@ void setupEthernetShield() {
   byte mac[] = { 0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED };//mac ethernet shield
   Ethernet.begin(mac);
   delay(2000);
-  if (isRaspberryExecution() && (!hasRaspberryIP() || !isLinkOff())) {
+  if (isRaspberryExecution() && !hasRaspberryIP() && !isLinkOff()) {
     configRaspberry();
   }
   
@@ -277,7 +264,7 @@ void setup() {
   sensors2.begin();
 
   lcd.clear();
-  lcd.println(F("Iniciando rede"));
+  lcd.print(F("Iniciando rede"));
   setupEthernetShield();
   delay(1000);
 
@@ -286,7 +273,7 @@ void setup() {
 
 
 void loop() {
-  delay(60000);
+  delay(1000);
   if (!isLocalExecution() && (isLinkOff() || (isRaspberryExecution() && !hasRaspberryIP()))) {
     setupEthernetShield();
   }
