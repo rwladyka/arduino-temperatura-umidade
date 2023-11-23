@@ -51,9 +51,9 @@ StaticJsonDocument<200> doc;
 
 // Constantes
 String ID = "262121";
-char SERVER_ADDR[] = "homologacao.gestox.com.br"; //Server address
+char SERVER_ADDR[] = "homologacao.com.br"; //Server address
 int SERVER_PORT = 80;
-char SERVER_QUERY[] = "homologacao.gestox.com.br"; //Server address
+char SERVER_QUERY[] = "homologacao.com.br"; //Server address
 int SERVER_QUERY_PORT = 80;
 String RASP_ADDR; //Raspberry hostname
 String INVALID_IP = "0.0.0.0";
